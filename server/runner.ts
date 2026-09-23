@@ -55,7 +55,9 @@ export class Runner {
       dataset,
       protocol: {
         version: PROTOCOL_VERSION, stageTimeoutMs: STAGE_TIMEOUT_MS, maxCompletionTokens: 2048,
-        retries: 0, llmBaseUrl: options.mode === 'live' ? configuration.llmBaseUrl : '',
+        retries: 0,
+        llmProtocol: options.mode === 'live' && options.arms.some(arm => arm !== 'jev') ? configuration.llmProtocol : null,
+        llmBaseUrl: options.mode === 'live' ? configuration.llmBaseUrl : '',
       },
       createdAt: new Date().toISOString(), completedAt: null, status: 'running', options,
       total: jobs.length, observations: [],

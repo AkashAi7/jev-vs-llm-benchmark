@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Check, KeyRound, LockKeyhole, Plug, Save, ShieldCheck } from 'lucide-react';
-import type { ConfigUpdate, PublicConfig } from '../../shared/types';
+import { LLM_PROTOCOLS, type ConfigUpdate, type LlmProtocol, type PublicConfig } from '../../shared/types';
 import { errorMessage } from '../lib/api';
 import { ErrorNotice } from './Status';
 
 export function Connections({ config, save }: { config: PublicConfig; save: (update: ConfigUpdate) => Promise<void> }) {
+  const [protocol, setProtocol] = useState<LlmProtocol>(config.llmProtocol);
   const [baseUrl, setBaseUrl] = useState(config.llmBaseUrl);
   const [llmModel, setLlmModel] = useState(config.llmModel);
   const [llmApiKey, setLlmApiKey] = useState('');
@@ -13,9 +14,20 @@ export function Connections({ config, save }: { config: PublicConfig; save: (upd
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const changeProtocol = (next: LlmProtocol) => {
+    const defaults: Record<LlmProtocol, string> = {
+      'openai-compatible': 'https://api.openai.com/v1/',
+      anthropic: 'https://api.anthropic.com/v1/',
+      gemini: 'https://generativelanguage.googleapis.com/v1beta/',
+    };
+    const known = Object.values(defaults);
+    if (!baseUrl || known.includes(baseUrl)) setBaseUrl(defaults[next]);
+    setProtocol(next);
+  };
 
   const submit = async (clearKeys = false) => {
     const update: ConfigUpdate = clearKeys ? { clearKeys: true } : {
+      llmProtocol: protocol,
       llmBaseUrl: baseUrl.trim(),
       llmModel: llmModel.trim(),
       jevModel: jevModel.trim(),
@@ -41,14 +53,17 @@ export function Connections({ config, save }: { config: PublicConfig; save: (upd
         <form onSubmit={event => { event.preventDefault(); void submit(); }}>
           <fieldset disabled={busy}><legend className="sr-only">Provider credentials and model settings</legend>
             <div className="provider-heading"><h3><span className="arm-dot llm" />General LLM</h3><span className={`config-status ${config.llmConfigured ? 'configured' : ''}`}>{config.llmConfigured ? 'Configured' : 'Not configured'}</span></div>
-            <label>OpenAI-compatible base URL<input type="url" value={baseUrl} onChange={event => setBaseUrl(event.target.value)}
-              placeholder="https://api.openai.com/v1/" autoComplete="url" aria-describedby="endpoint-help" /></label>
+            <label>API protocol<select value={protocol} onChange={event => changeProtocol(event.target.value as LlmProtocol)}>
+              {LLM_PROTOCOLS.map(value => <option key={value} value={value}>{value === 'openai-compatible' ? 'OpenAI-compatible' : value === 'anthropic' ? 'Anthropic Messages' : 'Google Gemini'}</option>)}
+            </select></label>
+            <label>Provider base URL<input type="url" value={baseUrl} onChange={event => setBaseUrl(event.target.value)}
+              placeholder="Provider API base URL" autoComplete="url" aria-describedby="endpoint-help" /></label>
             <p id="endpoint-help" className="field-help">Remote endpoints require HTTPS. Loopback HTTP is allowed for local model servers.</p>
             <label>Model name<input type="text" value={llmModel} onChange={event => setLlmModel(event.target.value)}
               placeholder="Provider model identifier" autoComplete="off" /></label>
             <label>LLM API key<input type="password" value={llmApiKey} onChange={event => setLlmApiKey(event.target.value)}
               placeholder={config.llmConfigured ? 'Key is configured · enter to replace' : 'Enter provider API key'} autoComplete="new-password" spellCheck={false} /></label>
-            <p className="field-help">The endpoint must support Chat Completions with strict JSON-schema structured output.</p>
+            <p className="field-help">The benchmark uses the selected provider's native structured-output mechanism and normalizes the result.</p>
             <div className="provider-divider" />
             <div className="provider-heading"><h3><span className="arm-dot jev" />Jev</h3><span className={`config-status ${config.jevConfigured ? 'configured' : ''}`}>{config.jevConfigured ? 'Configured' : 'Not configured'}</span></div>
             <label>Jev model<input type="text" value={jevModel} onChange={event => setJevModel(event.target.value)} autoComplete="off" required /></label>
@@ -66,9 +81,9 @@ export function Connections({ config, save }: { config: PublicConfig; save: (upd
     <aside className="connection-guide">
       <section className="panel guide-section"><span className="eyebrow">PROVIDER-AGNOSTIC</span><h2>Use your LLM endpoint.</h2>
         <ol className="setup-steps">
-          <li><span>1</span><div><h3>Choose a compatible provider</h3><p>Use any hosted or local endpoint implementing the OpenAI Chat Completions contract.</p></div></li>
+          <li><span>1</span><div><h3>Choose an API protocol</h3><p>Use OpenAI-compatible Chat Completions, Anthropic Messages, or Google Gemini generateContent.</p></div></li>
           <li><span>2</span><div><h3>Enter URL, key, and model</h3><p>Use the provider's base URL and exact model identifier. Local servers can use a placeholder key if their API requires none.</p></div></li>
-          <li><span>3</span><div><h3>Check structured output</h3><p>Run <code>npm run check:llm</code>. The selected model must support strict JSON-schema output.</p></div></li>
+          <li><span>3</span><div><h3>Check structured output</h3><p>Run <code>npm run check:llm</code>. The adapter validates every result against the same decision schema.</p></div></li>
         </ol>
         <p className="guide-callout">Compatibility is capability-based, not vendor-based. A configured endpoint is not considered verified until a request succeeds.</p>
       </section>

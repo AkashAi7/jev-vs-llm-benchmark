@@ -79,7 +79,7 @@ test('empty diagnostics are explicitly unmeasured and invalid gates fail', () =>
 test('saved report and JSON diagnostics use run threshold and saved scenario definitions', () => {
   const run: BenchmarkRun = {
     id: 'test', datasetVersion: 'test', datasetHash: 'test', dataset: { scenarios, cases },
-    protocol: { version: 'test', stageTimeoutMs: 60000, maxCompletionTokens: 2048, retries: 0, llmBaseUrl: '' },
+    protocol: { version: 'test', stageTimeoutMs: 60000, maxCompletionTokens: 2048, retries: 0, llmProtocol: null, llmBaseUrl: '' },
     createdAt: '', completedAt: '', status: 'completed',
     options: { mode: 'demo', arms: ['jev'], scenarioIds: ['support'], repetitions: 1, threshold: 0.95, seed: 42 },
     total: 1, observations: [observation(0.9)], models: { jev: 'test', llm: '' }, fatalError: null,

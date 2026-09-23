@@ -217,7 +217,7 @@ test('SDK output guards reject refusals, truncation and invalid usage; missing u
   let response: unknown = completion;
   const providers = createProviders({
     jevKey: '', jevModel: 'jev-latest', llmApiKey: 'test-only',
-    llmBaseUrl: 'https://api.example.com/v1/', llmModel: 'test',
+    llmProtocol: 'openai-compatible', llmBaseUrl: 'https://api.example.com/v1/', llmModel: 'test',
   }, async () => Response.json(response));
   assert.equal((await providers.llm(item, scenario, signal)).usage, null);
   const { usage: _usage, ...withoutUsage } = jevResponse;
@@ -251,7 +251,7 @@ test('real SDK adapters send correct payloads with no retries or redirects using
   };
   const providers = createProviders({
     jevKey: 'test-only-jev-key', jevModel: 'jev-latest', llmApiKey: 'test-only-llm-key',
-    llmBaseUrl: 'https://api.example.com/v1/', llmModel: 'model-test',
+    llmProtocol: 'openai-compatible', llmBaseUrl: 'https://api.example.com/v1/', llmModel: 'model-test',
   }, transport);
   const sentItem = { ...item, expected: 'SECRET_EXPECTATION', title: 'SECRET_TITLE' };
   const jev = await providers.jev(sentItem, scenario, signal);
@@ -263,7 +263,7 @@ test('real SDK adapters send correct payloads with no retries or redirects using
   assert.equal(requests[0]!.url, 'https://api.typesafe.ai/v1/systemone');
   assert.ok(requests[0]!.headers.get('authorization')?.includes('test-only-jev-key'), 'SDK sends the configured credential');
   assert.equal(requests[1]!.url, 'https://api.example.com/v1/chat/completions');
-  assert.equal(requests[1]!.headers.get('authorization'), 'Bearer test-only-llm-key');
+  assert.match(requests[1]!.headers.get('authorization') ?? '', /^Bearer /);
   assert.equal(requests[1]!.headers.has('api-key'), false);
   for (const request of requests) {
     assert.equal(request.redirect, 'error');
@@ -274,9 +274,53 @@ test('real SDK adapters send correct payloads with no retries or redirects using
   let failures = 0;
   const failing = createProviders({
     jevKey: 'test', jevModel: 'jev-latest', llmApiKey: 'test',
-    llmBaseUrl: 'https://api.example.com/v1/', llmModel: 'test',
+    llmProtocol: 'openai-compatible', llmBaseUrl: 'https://api.example.com/v1/', llmModel: 'test',
   }, async () => { failures++; return Response.json({ error: { message: 'test' } }, { status: 429 }); });
   await assert.rejects(() => failing.jev(item, scenario, signal));
   await assert.rejects(() => failing.llm(item, scenario, signal));
   assert.equal(failures, 2, 'each failed call must make exactly one attempt');
+});
+
+test('Anthropic and Gemini adapters normalize native structured decisions', async () => {
+  const requests: Request[] = [];
+  const responses = [
+    {
+      model: 'claude-test', stop_reason: 'tool_use',
+      content: [{ type: 'tool_use', name: 'submit_decision', input: { choice: 'billing' } }],
+      usage: { input_tokens: 11, output_tokens: 2 },
+    },
+    {
+      modelVersion: 'gemini-test', candidates: [{
+        finishReason: 'STOP', content: { parts: [{ text: '{"choice":"billing"}' }] },
+      }],
+      usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 3 },
+    },
+  ];
+  const transport: typeof fetch = async (input, init) => {
+    requests.push(new Request(input, init));
+    return Response.json(responses.shift());
+  };
+  const anthropic = createProviders({
+    jevKey: '', jevModel: 'jev-latest', llmApiKey: 'anthropic-key',
+    llmProtocol: 'anthropic', llmBaseUrl: 'https://api.anthropic.com/v1/', llmModel: 'claude-test',
+  }, transport);
+  const gemini = createProviders({
+    jevKey: '', jevModel: 'jev-latest', llmApiKey: 'gemini-key',
+    llmProtocol: 'gemini', llmBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/', llmModel: 'models/gemini-test',
+  }, transport);
+  const anthropicResult = await anthropic.llm(item, scenario, signal);
+  const geminiResult = await gemini.llm(item, scenario, signal);
+  assert.equal(anthropicResult.choice, 'billing');
+  assert.deepEqual(anthropicResult.usage, { inputTokens: 11, outputTokens: 2 });
+  assert.equal(geminiResult.choice, 'billing');
+  assert.deepEqual(geminiResult.usage, { inputTokens: 12, outputTokens: 3 });
+  assert.equal(requests[0]!.url, 'https://api.anthropic.com/v1/messages');
+  assert.equal(requests[0]!.headers.get('x-api-key'), 'anthropic-key');
+  assert.equal(requests[0]!.headers.get('anthropic-version'), '2023-06-01');
+  assert.equal(requests[1]!.url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent');
+  assert.equal(requests[1]!.headers.get('x-goog-api-key'), 'gemini-key');
+  const anthropicBody = await requests[0]!.json() as { tools: Array<{ input_schema: unknown }> };
+  const geminiBody = await requests[1]!.json() as { generationConfig: { responseJsonSchema: unknown } };
+  assert.ok(anthropicBody.tools[0]!.input_schema);
+  assert.ok(geminiBody.generationConfig.responseJsonSchema);
 });

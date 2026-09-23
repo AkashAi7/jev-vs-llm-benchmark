@@ -25,6 +25,7 @@ export function ReportProvenance({ run }: { run: BenchmarkRun }) {
         <div><dt>Timestamps</dt><dd>Started {dateTime(run.createdAt)}{run.completedAt ? ` · Finished ${dateTime(run.completedAt)}` : ' · Not finished'}</dd></div>
         <div><dt>Dataset snapshot</dt><dd>{run.datasetVersion}<small><code>SHA-256 {run.datasetHash}</code></small></dd></div>
         <div><dt>Execution</dt><dd>Serial, seeded order · {run.protocol.retries} retries · {run.protocol.stageTimeoutMs.toLocaleString()} ms stage timeout · {run.protocol.maxCompletionTokens} completion-token limit</dd></div>
+        <div><dt>LLM protocol</dt><dd>{run.protocol.llmProtocol ?? 'Not used for this run'}</dd></div>
         <div><dt>LLM base URL</dt><dd>{run.protocol.llmBaseUrl || 'Not used for this run'}<small>Credentials are never saved in the report.</small></dd></div>
         <div><dt>Stage-reported models</dt><dd>{actualModels.length ? actualModels.join(' · ') : 'No completed provider stages'}</dd></div>
       </dl>

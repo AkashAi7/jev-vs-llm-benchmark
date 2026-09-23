@@ -111,6 +111,7 @@ test('HTTP lifecycle: safe config, validation, full demo, export, persistence an
   assert.equal(result.datasetHash.length, 64);
   assert.equal(result.protocol.retries, 0);
   assert.equal(result.protocol.llmBaseUrl, '');
+  assert.equal(result.protocol.llmProtocol, null);
   for (const arm of options.arms) assert.equal(result.observations.filter(row => row.arm === arm).length, 6);
   const exported = await fetch(`${url}/api/runs/${started.id}/export?format=json`);
   assert.match(exported.headers.get('content-disposition')!, /benchmark-demo-/);
@@ -150,6 +151,7 @@ test('base URL provenance survives persistence and exports without saving creden
   const run = await runner.start({ ...options, mode: 'live', arms: ['llm'] });
   await runner.waitForIdle();
   assert.equal(run.protocol.llmBaseUrl, 'https://api.example.com/v1/');
+  assert.equal(run.protocol.llmProtocol, 'openai-compatible');
   const loaded = (await store.load()).find(value => value.id === run.id)!;
   assert.equal(loaded.protocol.llmBaseUrl, 'https://api.example.com/v1/');
   for (const output of [exportJson(loaded), exportCsv(loaded), await readFile(path.join(directory, `${run.id}.json`), 'utf8')]) {
@@ -173,6 +175,24 @@ test('restart marks unfinished runs interrupted and preserves completed observat
   assert.match(restored.fatalError!, /server stopped/);
   const json = JSON.parse(exportJson(restored)) as { dataset: unknown };
   assert.deepEqual(json.dataset, run.dataset);
+});
+
+test('saved runs from before protocol selection load as OpenAI-compatible', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'jev-benchmark-legacy-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const runner = new Runner(new Configuration({}), new RunStore(directory));
+  await runner.initialize();
+  const run = await runner.start(options);
+  await runner.waitForIdle();
+  const file = path.join(directory, `${run.id}.json`);
+  const raw = JSON.parse(await readFile(file, 'utf8')) as {
+    protocol: { llmBaseUrl: string; llmProtocol?: unknown };
+  };
+  raw.protocol.llmBaseUrl = 'https://api.example.com/v1/';
+  delete raw.protocol.llmProtocol;
+  await writeFile(file, JSON.stringify(raw));
+  const loaded = await new RunStore(directory).load();
+  assert.equal(loaded[0]!.protocol.llmProtocol, 'openai-compatible');
 });
 
 test('CSV protects spreadsheet formulas and escapes quotes/newlines', () => {
@@ -236,6 +256,7 @@ test('live provider failure stays live and is never replaced by a demo predictio
   await runner.waitForIdle();
   assert.equal(run.status, 'completed', 'completion is distinct from successful provider results');
   assert.equal(run.protocol.llmBaseUrl, '');
+  assert.equal(run.protocol.llmProtocol, null);
   assert.equal(run.observations.length, 6);
   assert.ok(run.observations.every(row => row.status === 'error' && row.predicted === null && row.stages.length === 0));
   assert.ok(!exportJson(run).includes('secret response'));

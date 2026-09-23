@@ -1,5 +1,7 @@
 export const ARMS = ['llm', 'jev', 'hybrid'] as const;
 export type Arm = typeof ARMS[number];
+export const LLM_PROTOCOLS = ['openai-compatible', 'anthropic', 'gemini'] as const;
+export type LlmProtocol = typeof LLM_PROTOCOLS[number];
 export const ARM_LABELS: Record<Arm, string> = {
   llm: 'General LLM',
   jev: 'Jev',
@@ -69,7 +71,8 @@ export interface BenchmarkRun {
   datasetHash: string;
   dataset: { scenarios: Scenario[]; cases: BenchmarkCase[] };
   protocol: {
-    version: string; stageTimeoutMs: number; maxCompletionTokens: number; retries: number; llmBaseUrl: string;
+    version: string; stageTimeoutMs: number; maxCompletionTokens: number; retries: number;
+    llmProtocol: LlmProtocol | null; llmBaseUrl: string;
   };
   createdAt: string;
   completedAt: string | null;
@@ -102,6 +105,7 @@ export interface PublicConfig {
   csrfToken: string;
   jevConfigured: boolean;
   llmConfigured: boolean;
+  llmProtocol: LlmProtocol;
   llmBaseUrl: string;
   llmModel: string;
   jevModel: string;
@@ -110,6 +114,7 @@ export interface PublicConfig {
 export interface ConfigUpdate {
   jevKey?: string;
   llmApiKey?: string;
+  llmProtocol?: LlmProtocol;
   llmBaseUrl?: string;
   llmModel?: string;
   jevModel?: string;

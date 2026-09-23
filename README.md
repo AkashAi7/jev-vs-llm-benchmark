@@ -8,7 +8,7 @@ This repository contains only the benchmark. It does **not** include an LLM-to-J
 
 ## What you can compare
 
-- **General LLM:** any OpenAI-compatible Chat Completions endpoint supporting strict JSON-schema structured output.
+- **General LLM:** OpenAI-compatible, Anthropic, or Google Gemini APIs through native protocol adapters.
 - **Jev:** the TypeSafe Jev Choice API.
 - **Hybrid:** Jev first, then the configured LLM when Jev confidence is below the selected gate.
 
@@ -36,19 +36,24 @@ Edit the ignored `.env` file or use the local Connections page:
 TYPESAFE_API_KEY=
 JEV_MODEL=jev-latest
 
-# OpenAI-compatible endpoint
+# openai-compatible, anthropic, or gemini
+LLM_PROTOCOL=openai-compatible
 LLM_BASE_URL=https://api.openai.com/v1/
 LLM_API_KEY=
 LLM_MODEL=
 ```
 
-Remote LLM endpoints must use HTTPS. Loopback HTTP is allowed for local OpenAI-compatible servers such as `http://127.0.0.1:8000/v1/`.
+Supported protocols:
 
-The selected LLM must support:
+| `LLM_PROTOCOL` | API used | Default base URL |
+|---|---|---|
+| `openai-compatible` | Chat Completions with strict JSON schema | `https://api.openai.com/v1/` |
+| `anthropic` | Messages API with a forced decision tool | `https://api.anthropic.com/v1/` |
+| `gemini` | `generateContent` with a response JSON schema | `https://generativelanguage.googleapis.com/v1beta/` |
 
-- `POST /chat/completions`
-- strict JSON-schema response format
-- the configured model identifier
+OpenAI-compatible mode also supports local servers such as vLLM, Ollama-compatible gateways, LM Studio, and other implementations that expose the required Chat Completions structured-output contract. Remote endpoints must use HTTPS; loopback HTTP is allowed.
+
+Each adapter converts the same benchmark prompt and decision schema into the provider's native request, then normalizes model name, decision, token usage, and errors into one result format. This keeps the benchmark arm stable while allowing different providers and API families.
 
 Run one connectivity request before a full benchmark:
 

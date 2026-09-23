@@ -16,7 +16,6 @@
     "@typesafe-ai/sdk": "^0.5.7",
     "express": "^5.1.0",
     "lucide-react": "^0.468.0",
-    "openai": "^6.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^4.1.0"

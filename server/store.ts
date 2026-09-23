@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import type { BenchmarkRun } from '../shared/types';
+import { LLM_PROTOCOLS } from '../shared/types';
 import { LabError } from './errors';
 
 const runFile = /^[0-9a-f-]{36}\.json$/;
@@ -77,8 +78,11 @@ const persistedRunSchema = z.object({
   }),
   protocol: z.object({
     version: z.string(), stageTimeoutMs: nonNegative, maxCompletionTokens: nonNegative,
-    retries: nonNegative, llmBaseUrl: z.string(),
-  }),
+    retries: nonNegative, llmProtocol: z.enum(LLM_PROTOCOLS).nullable().optional(), llmBaseUrl: z.string(),
+  }).transform(protocol => ({
+    ...protocol,
+    llmProtocol: protocol.llmProtocol ?? (protocol.llmBaseUrl ? 'openai-compatible' as const : null),
+  })),
   createdAt: z.string(), completedAt: z.string().nullable(),
   status: z.enum(['running', 'completed', 'cancelled', 'failed', 'interrupted']),
   options: optionsSchema, total: nonNegative,

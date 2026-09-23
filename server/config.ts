@@ -1,12 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import type { ConfigUpdate, PublicConfig, RunOptions } from '../shared/types';
+import { LLM_PROTOCOLS, type ConfigUpdate, type LlmProtocol, type PublicConfig, type RunOptions } from '../shared/types';
 import { LabError } from './errors';
 
 export interface ProviderConfig {
   jevKey: string;
   jevModel: string;
   llmApiKey: string;
+  llmProtocol: LlmProtocol;
   llmBaseUrl: string;
   llmModel: string;
 }
@@ -16,6 +17,7 @@ export const configSchema = z.object({
   jevKey: z.string().trim().min(1).max(2048).optional(),
   jevModel: modelName.optional(),
   llmApiKey: z.string().trim().min(1).max(4096).optional(),
+  llmProtocol: z.enum(LLM_PROTOCOLS).optional(),
   llmBaseUrl: z.string().trim().max(500).optional(),
   llmModel: modelName.or(z.literal('')).optional(),
   clearKeys: z.boolean().optional(),
@@ -24,7 +26,7 @@ export const configSchema = z.object({
 export function normalizeBaseUrl(value: string): string {
   if (!value) return '';
   let url: URL;
-  try { url = new URL(value); } catch { throw new LabError('Use a valid OpenAI-compatible base URL.'); }
+  try { url = new URL(value); } catch { throw new LabError('Use a valid LLM API base URL.'); }
   const loopback = ['127.0.0.1', 'localhost', '::1'].includes(url.hostname);
   if ((!loopback && url.protocol !== 'https:') || (loopback && !['http:', 'https:'].includes(url.protocol))
       || url.username || url.password || url.search || url.hash) {
@@ -43,6 +45,7 @@ export class Configuration {
       jevKey: env.TYPESAFE_API_KEY?.trim() ?? '',
       jevModel: modelName.parse(env.JEV_MODEL ?? 'jev-latest'),
       llmApiKey: env.LLM_API_KEY?.trim() ?? '',
+      llmProtocol: z.enum(LLM_PROTOCOLS).parse(env.LLM_PROTOCOL?.trim() ?? 'openai-compatible'),
       llmBaseUrl: normalizeBaseUrl(env.LLM_BASE_URL?.trim() ?? ''),
       llmModel: modelName.or(z.literal('')).parse(env.LLM_MODEL ?? ''),
     };
@@ -55,6 +58,7 @@ export class Configuration {
       csrfToken: this.csrfToken,
       jevConfigured: Boolean(this.value.jevKey),
       llmConfigured: Boolean(this.value.llmApiKey && this.value.llmBaseUrl && this.value.llmModel),
+      llmProtocol: this.value.llmProtocol,
       llmBaseUrl: this.value.llmBaseUrl,
       llmModel: this.value.llmModel,
       jevModel: this.value.jevModel,
@@ -71,6 +75,7 @@ export class Configuration {
     if (patch.jevKey) next.jevKey = patch.jevKey;
     if (patch.jevModel) next.jevModel = patch.jevModel;
     if (patch.llmApiKey) next.llmApiKey = patch.llmApiKey;
+    if (patch.llmProtocol) next.llmProtocol = patch.llmProtocol;
     if (patch.llmBaseUrl !== undefined) next.llmBaseUrl = normalizeBaseUrl(patch.llmBaseUrl);
     if (patch.llmModel !== undefined) next.llmModel = patch.llmModel;
     this.value = next;
@@ -84,6 +89,6 @@ export function requireConfigured(options: RunOptions, config: ProviderConfig): 
     throw new LabError('Jev is not configured. Add a Jev API key in Connections or select only the LLM arm.');
   }
   if (options.arms.some(arm => arm !== 'jev') && (!config.llmApiKey || !config.llmBaseUrl || !config.llmModel)) {
-    throw new LabError('The LLM is not configured. Add an OpenAI-compatible base URL, API key, and model in Connections, or select only the Jev arm.');
+    throw new LabError('The LLM is not configured. Select a protocol and add its base URL, API key, and model in Connections, or select only the Jev arm.');
   }
 }
