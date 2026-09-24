@@ -2,6 +2,8 @@
 
 A provider-agnostic, local-first benchmark for comparing **Jev**, a **general-purpose LLM**, and a **confidence-gated hybrid** on the same fixed-choice decisions.
 
+[![Jev vs LLM runnable benchmark infographic](deliverables/jev-vs-llm-runnable-benchmark.png)](deliverables/jev-vs-llm-runnable-benchmark.png)
+
 Measure accuracy, macro F1, p50/p95 latency, token usage, routing, failures, and case-level evidence. Choose the tasks, arms, repetitions, seed, and hybrid confidence gate from the dashboard.
 
 This repository contains only the benchmark. It does **not** include an LLM-to-Jev conversion utility.
